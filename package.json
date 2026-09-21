@@ -1,0 +1,26 @@
+{
+  "name": "ppgfood-painel",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build"
+  },
+  "dependencies": {
+    "axios": "^0.21.4",
+    "bootstrap": "^5.1.3",
+    "bootstrap-vue": "^2.21.2",
+    "core-js": "^3.6.5",
+    "laravel-echo": "^1.9.0",
+    "socket.io-client": "^2.3.0",
+    "vue": "^2.6.14",
+    "vue-router": "^3.5.2",
+    "vue-toastify": "^1.8.0",
+    "vuex": "^3.6.2"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "~4.5.0",
+    "@vue/cli-service": "~4.5.0",
+    "vue-template-compiler": "^2.6.11"
+  }
+}

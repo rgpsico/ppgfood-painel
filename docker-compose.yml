@@ -1,0 +1,14 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: ppgfood_painel
+    ports:
+      - "8082:80"
+    networks:
+      - proxy_net
+
+networks:
+  proxy_net:
+    external: true
