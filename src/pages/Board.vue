@@ -8,7 +8,24 @@
       <button class="btn-logout" @click="doLogout">Sair</button>
     </header>
 
-    <div class="sea" v-if="!loading">
+    <div class="tabs">
+      <button
+        class="tab-btn"
+        :class="{ active: activeTab === 'live' }"
+        @click="activeTab = 'live'"
+      >
+        Ao vivo
+      </button>
+      <button
+        class="tab-btn"
+        :class="{ active: activeTab === 'history' }"
+        @click="showHistory"
+      >
+        Histórico
+      </button>
+    </div>
+
+    <div class="sea" v-if="activeTab === 'live' && !loading">
       <div class="table-grid">
         <div
           v-for="table in tables"
@@ -53,6 +70,62 @@
       </div>
     </div>
 
+    <div class="history" v-else-if="activeTab === 'history'">
+      <div class="history-filters">
+        <div class="filter-group">
+          <label>Status</label>
+          <select v-model="filterStatus" class="form-control" @change="showHistory">
+            <option value="pending">Pendentes</option>
+            <option value="delivered">Entregues</option>
+            <option value="all">Todos</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label>Guarda-sol / cadeira</label>
+          <select v-model="filterTable" class="form-control" @change="showHistory">
+            <option value="">Todos</option>
+            <option v-for="table in tables" :key="table.identify" :value="table.identify">
+              {{ table.name }}
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <div v-if="historyLoading" class="loading-state">Carregando...</div>
+
+      <table v-else class="history-table">
+        <thead>
+          <tr>
+            <th>Pedido</th>
+            <th>Local</th>
+            <th>Status</th>
+            <th>Horário</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="order in historyOrders"
+            :key="order.identify"
+            @click="openDetails(order)"
+          >
+            <td>{{ order.identify }}</td>
+            <td>{{ order.table && order.table.name ? order.table.name : "Sem mesa" }}</td>
+            <td>
+              <span class="status-pill" :class="`status-${order.status}`">{{ order.status_label }}</span>
+            </td>
+            <td>{{ order.date_br }}</td>
+            <td>R$ {{ order.total }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div v-if="!historyLoading && historyOrders.length === 0" class="empty-state">
+        Nenhum pedido encontrado com esse filtro.
+      </div>
+    </div>
+
     <div v-else class="loading-state">Carregando...</div>
 
     <audio ref="alertSound" :src="alertSoundUrl" preload="auto"></audio>
@@ -84,6 +157,21 @@
         <hr />
 
         <p class="order-total"><strong>Total: R$ {{ selectedOrder.total }}</strong></p>
+
+        <button
+          class="btn-status"
+          :class="selectedOrder.status === 'done' ? 'btn-undo' : 'btn-deliver'"
+          :disabled="updatingStatus"
+          @click="toggleDelivered"
+        >
+          {{
+            updatingStatus
+              ? "Salvando..."
+              : selectedOrder.status === "done"
+              ? "Marcar como pendente"
+              : "Marcar como entregue"
+          }}
+        </button>
       </div>
     </b-modal>
   </div>
@@ -101,6 +189,10 @@ export default {
     return {
       selectedOrder: null,
       alertSoundUrl: `${SOCKET_URL}/mp3/alert.wav`,
+      activeTab: "live",
+      filterStatus: "pending",
+      filterTable: "",
+      updatingStatus: false,
     };
   },
 
@@ -111,6 +203,8 @@ export default {
       ordersWithoutTable: (state) => state.board.ordersWithoutTable,
       loading: (state) => state.board.loading,
       blinkingTable: (state) => state.board.blinkingTable,
+      historyOrders: (state) => state.board.historyOrders,
+      historyLoading: (state) => state.board.historyLoading,
     }),
   },
 
@@ -126,8 +220,36 @@ export default {
   },
 
   methods: {
-    ...mapActions(["loadBoard", "logout"]),
+    ...mapActions(["loadBoard", "logout", "loadHistory", "updateOrderStatus"]),
     ...mapMutations(["APPLY_NEW_ORDER", "CLEAR_BLINK"]),
+
+    showHistory() {
+      this.activeTab = "history";
+      this.loadHistory({ status: this.filterStatus, table: this.filterTable });
+    },
+
+    toggleDelivered() {
+      const newStatus = this.selectedOrder.status === "done" ? "open" : "done";
+      this.updatingStatus = true;
+
+      this.updateOrderStatus({ identify: this.selectedOrder.identify, status: newStatus })
+        .then((updatedOrder) => {
+          this.selectedOrder = updatedOrder;
+          this.$vToastify.success(
+            newStatus === "done" ? "Pedido marcado como entregue" : "Pedido marcado como pendente",
+            "Pronto"
+          );
+          if (this.activeTab === "history") {
+            this.loadHistory({ status: this.filterStatus, table: this.filterTable });
+          }
+        })
+        .catch(() => {
+          this.$vToastify.error("Não foi possível atualizar o status", "Erro");
+        })
+        .finally(() => {
+          this.updatingStatus = false;
+        });
+    },
 
     connectRealtime() {
       if (!this.me) return;
@@ -285,5 +407,131 @@ export default {
 
 .order-total {
   font-size: 18px;
+}
+
+.btn-status {
+  width: 100%;
+  margin-top: 16px;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+}
+
+.btn-status:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.btn-deliver {
+  background: #28a745;
+}
+
+.btn-undo {
+  background: #6c757d;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  padding: 0 24px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.tab-btn {
+  border: none;
+  background: transparent;
+  padding: 12px 16px;
+  font-weight: 600;
+  color: #6c757d;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+}
+
+.tab-btn.active {
+  color: #0a4d78;
+  border-bottom-color: #0a4d78;
+}
+
+.history {
+  flex: 1;
+  padding: 24px;
+}
+
+.history-filters {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filter-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #fff;
+}
+
+.filter-group .form-control {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: none;
+  min-width: 200px;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.history-table th,
+.history-table td {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 14px;
+}
+
+.history-table thead {
+  background: #0a4d78;
+  color: #fff;
+}
+
+.history-table tbody tr {
+  cursor: pointer;
+  border-top: 1px solid #eee;
+}
+
+.history-table tbody tr:hover {
+  background: #f4f9fc;
+}
+
+.status-pill {
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.status-open,
+.status-working,
+.status-delivering {
+  background: #ffc107;
+  color: #333;
+}
+
+.status-done {
+  background: #28a745;
+}
+
+.status-rejected,
+.status-canceled {
+  background: #dc3545;
 }
 </style>
