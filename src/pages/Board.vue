@@ -30,7 +30,7 @@
         Toque em um guarda-sol para ver os pedidos. Arraste pra reorganizar o mapa.
       </p>
 
-      <div class="beach-canvas" ref="beachCanvas">
+      <div class="beach-canvas" ref="beachCanvas" :style="{ minHeight: beachHeight + 'px' }">
         <div
           v-for="table in tablesWithPosition"
           :key="table.identify"
@@ -279,6 +279,14 @@ export default {
 
         return { ...table, x, y };
       });
+    },
+
+    // Cresce conforme o numero de guarda-sois, pra ter espaco suficiente
+    // pra arrastar sem ficar tudo espremido
+    beachHeight() {
+      const columns = 5;
+      const rows = Math.ceil(this.tables.length / columns) || 1;
+      return Math.max(480, 160 + rows * 160);
     },
   },
 
