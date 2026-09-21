@@ -248,6 +248,7 @@ export default {
       },
       dragging: null,
       liveDragPos: null,
+      windowWidth: window.innerWidth,
     };
   },
 
@@ -262,10 +263,18 @@ export default {
       historyLoading: (state) => state.board.historyLoading,
     }),
 
+    // Menos colunas em telas estreitas, senao os cards de 110px
+    // se sobrepoem no celular
+    gridColumns() {
+      if (this.windowWidth < 480) return 2;
+      if (this.windowWidth < 768) return 3;
+      return 5;
+    },
+
     // Guarda-sois sem posicao salva ainda entram numa grade padrao,
     // ate o staff arrastar cada um pro lugar certo no mapa
     tablesWithPosition() {
-      const columns = 5;
+      const columns = this.gridColumns;
       return this.tables.map((table, index) => {
         let x = table.position_x;
         let y = table.position_y;
@@ -284,15 +293,15 @@ export default {
     // Cresce conforme o numero de guarda-sois, pra ter espaco suficiente
     // pra arrastar sem ficar tudo espremido
     beachHeight() {
-      const columns = 5;
-      const rows = Math.ceil(this.tables.length / columns) || 1;
-      return Math.max(480, 160 + rows * 160);
+      const rows = Math.ceil(this.tables.length / this.gridColumns) || 1;
+      return Math.max(420, 160 + rows * 160);
     },
   },
 
   mounted() {
     this.loadBoard();
     this.connectRealtime();
+    window.addEventListener("resize", this.onResize);
   },
 
   beforeDestroy() {
@@ -300,6 +309,7 @@ export default {
       echo.leaveChannel(`order-created.${this.me.tenant_id}`);
     }
 
+    window.removeEventListener("resize", this.onResize);
     window.removeEventListener("mousemove", this.onDragMove);
     window.removeEventListener("touchmove", this.onDragMove);
     window.removeEventListener("mouseup", this.endDrag);
@@ -348,6 +358,10 @@ export default {
         .finally(() => {
           this.updatingStatus = false;
         });
+    },
+
+    onResize() {
+      this.windowWidth = window.innerWidth;
     },
 
     connectRealtime() {
@@ -567,6 +581,46 @@ export default {
   cursor: grabbing;
   z-index: 10;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 768px) {
+  .beach-canvas .umbrella-card {
+    width: 84px;
+    padding: 12px 6px;
+    gap: 4px;
+  }
+
+  .beach-canvas .umbrella-icon {
+    font-size: 22px;
+  }
+
+  .beach-canvas .table-name {
+    font-size: 12px;
+  }
+
+  .beach-canvas .order-badge {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .beach-canvas .umbrella-card {
+    width: 68px;
+    padding: 8px 4px;
+  }
+
+  .beach-canvas .umbrella-icon {
+    font-size: 18px;
+  }
+
+  .beach-canvas .table-name {
+    font-size: 10px;
+  }
+
+  .sea {
+    padding: 20px 12px;
+  }
 }
 
 .table-grid {
