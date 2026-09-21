@@ -35,7 +35,7 @@
             'has-order': table.order,
             blinking: blinkingTable === table.identify,
           }"
-          @click="openDetails(table.order)"
+          @click="openTableOrders(table)"
         >
           <i class="fa-solid fa-umbrella-beach umbrella-icon"></i>
           <span class="table-name">{{ table.name }}</span>
@@ -131,6 +131,47 @@
     <audio ref="alertSound" :src="alertSoundUrl" preload="auto"></audio>
 
     <b-modal
+      id="modal-table-orders"
+      hide-footer
+      :title="tableOrdersModal.table ? `Pedidos - ${tableOrdersModal.table.name}` : ''"
+    >
+      <div v-if="tableOrdersModal.loading" class="loading-state loading-state-dark">
+        Carregando...
+      </div>
+
+      <div v-else>
+        <table v-if="tableOrdersModal.orders.length > 0" class="history-table">
+          <thead>
+            <tr>
+              <th>Pedido</th>
+              <th>Status</th>
+              <th>Horário</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="order in tableOrdersModal.orders"
+              :key="order.identify"
+              @click="openDetailsFromTableOrders(order)"
+            >
+              <td>{{ order.identify }}</td>
+              <td>
+                <span class="status-pill" :class="`status-${order.status}`">{{ order.status_label }}</span>
+              </td>
+              <td>{{ order.date_br }}</td>
+              <td>R$ {{ order.total }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p v-else class="empty-state empty-state-dark">
+          Nenhum pedido registrado nesse guarda-sol ainda.
+        </p>
+      </div>
+    </b-modal>
+
+    <b-modal
       id="modal-order-details"
       hide-footer
       :title="selectedOrder ? `Pedido ${selectedOrder.identify}` : ''"
@@ -193,6 +234,11 @@ export default {
       filterStatus: "pending",
       filterTable: "",
       updatingStatus: false,
+      tableOrdersModal: {
+        table: null,
+        orders: [],
+        loading: false,
+      },
     };
   },
 
@@ -220,7 +266,7 @@ export default {
   },
 
   methods: {
-    ...mapActions(["loadBoard", "logout", "loadHistory", "updateOrderStatus"]),
+    ...mapActions(["loadBoard", "logout", "loadHistory", "updateOrderStatus", "getOrdersByTable"]),
     ...mapMutations(["APPLY_NEW_ORDER", "CLEAR_BLINK"]),
 
     showHistory() {
@@ -241,6 +287,11 @@ export default {
           );
           if (this.activeTab === "history") {
             this.loadHistory({ status: this.filterStatus, table: this.filterTable });
+          }
+          if (this.tableOrdersModal.table) {
+            this.getOrdersByTable(this.tableOrdersModal.table.identify).then((orders) => {
+              this.tableOrdersModal.orders = orders;
+            });
           }
         })
         .catch(() => {
@@ -266,6 +317,29 @@ export default {
       if (!order) return;
       this.selectedOrder = order;
       this.$bvModal.show("modal-order-details");
+    },
+
+    openTableOrders(table) {
+      this.tableOrdersModal.table = table;
+      this.tableOrdersModal.orders = [];
+      this.tableOrdersModal.loading = true;
+      this.$bvModal.show("modal-table-orders");
+
+      this.getOrdersByTable(table.identify)
+        .then((orders) => {
+          this.tableOrdersModal.orders = orders;
+        })
+        .catch(() => {
+          this.$vToastify.error("Não foi possível carregar os pedidos", "Erro");
+        })
+        .finally(() => {
+          this.tableOrdersModal.loading = false;
+        });
+    },
+
+    openDetailsFromTableOrders(order) {
+      this.$bvModal.hide("modal-table-orders");
+      this.openDetails(order);
     },
 
     doLogout() {
@@ -533,5 +607,10 @@ export default {
 .status-rejected,
 .status-canceled {
   background: #dc3545;
+}
+
+.loading-state-dark,
+.empty-state-dark {
+  color: #333;
 }
 </style>

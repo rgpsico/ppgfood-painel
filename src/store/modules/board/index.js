@@ -85,6 +85,12 @@ export default {
                 .finally(() => commit('SET_HISTORY_LOADING', false))
         },
 
+        getOrdersByTable({}, tableIdentify) {
+            return axios.get(`${API_VERSION}/staff/orders`, {
+                params: { status: 'all', table: tableIdentify },
+            }).then((response) => response.data.data)
+        },
+
         updateOrderStatus({ commit }, { identify, status }) {
             return axios.patch(`${API_VERSION}/staff/orders/${identify}/status`, { status })
                 .then((response) => {
