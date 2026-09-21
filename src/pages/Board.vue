@@ -26,16 +26,23 @@
     </div>
 
     <div class="sea" v-if="activeTab === 'live' && !loading">
-      <div class="table-grid">
+      <p class="beach-hint" v-if="tables.length > 0">
+        Toque em um guarda-sol para ver os pedidos. Arraste pra reorganizar o mapa.
+      </p>
+
+      <div class="beach-canvas" ref="beachCanvas">
         <div
-          v-for="table in tables"
+          v-for="table in tablesWithPosition"
           :key="table.identify"
           class="umbrella-card"
           :class="{
             'has-order': table.order,
             blinking: blinkingTable === table.identify,
+            dragging: dragging && dragging.identify === table.identify,
           }"
-          @click="openTableOrders(table)"
+          :style="cardStyle(table)"
+          @mousedown="startDrag($event, table)"
+          @touchstart="startDrag($event, table)"
         >
           <i class="fa-solid fa-umbrella-beach umbrella-icon"></i>
           <span class="table-name">{{ table.name }}</span>
@@ -239,6 +246,8 @@ export default {
         orders: [],
         loading: false,
       },
+      dragging: null,
+      liveDragPos: null,
     };
   },
 
@@ -252,6 +261,25 @@ export default {
       historyOrders: (state) => state.board.historyOrders,
       historyLoading: (state) => state.board.historyLoading,
     }),
+
+    // Guarda-sois sem posicao salva ainda entram numa grade padrao,
+    // ate o staff arrastar cada um pro lugar certo no mapa
+    tablesWithPosition() {
+      const columns = 5;
+      return this.tables.map((table, index) => {
+        let x = table.position_x;
+        let y = table.position_y;
+
+        if (x === null || x === undefined || y === null || y === undefined) {
+          const col = index % columns;
+          const row = Math.floor(index / columns);
+          x = 12 + col * (76 / (columns - 1 || 1));
+          y = 15 + row * 20;
+        }
+
+        return { ...table, x, y };
+      });
+    },
   },
 
   mounted() {
@@ -263,10 +291,22 @@ export default {
     if (this.me) {
       echo.leaveChannel(`order-created.${this.me.tenant_id}`);
     }
+
+    window.removeEventListener("mousemove", this.onDragMove);
+    window.removeEventListener("touchmove", this.onDragMove);
+    window.removeEventListener("mouseup", this.endDrag);
+    window.removeEventListener("touchend", this.endDrag);
   },
 
   methods: {
-    ...mapActions(["loadBoard", "logout", "loadHistory", "updateOrderStatus", "getOrdersByTable"]),
+    ...mapActions([
+      "loadBoard",
+      "logout",
+      "loadHistory",
+      "updateOrderStatus",
+      "getOrdersByTable",
+      "updateTablePosition",
+    ]),
     ...mapMutations(["APPLY_NEW_ORDER", "CLEAR_BLINK"]),
 
     showHistory() {
@@ -347,6 +387,100 @@ export default {
         this.$router.push({ name: "login" });
       });
     },
+
+    cardStyle(table) {
+      if (this.liveDragPos && this.liveDragPos.identify === table.identify) {
+        return {
+          left: `${this.liveDragPos.left}px`,
+          top: `${this.liveDragPos.top}px`,
+        };
+      }
+
+      return {
+        left: `${table.x}%`,
+        top: `${table.y}%`,
+      };
+    },
+
+    startDrag(event, table) {
+      event.preventDefault();
+      const rect = this.$refs.beachCanvas.getBoundingClientRect();
+      const point = event.touches ? event.touches[0] : event;
+
+      this.dragging = {
+        identify: table.identify,
+        rect,
+        startClientX: point.clientX,
+        startClientY: point.clientY,
+        moved: false,
+      };
+
+      this.liveDragPos = {
+        identify: table.identify,
+        left: point.clientX - rect.left,
+        top: point.clientY - rect.top,
+      };
+
+      window.addEventListener("mousemove", this.onDragMove);
+      window.addEventListener("touchmove", this.onDragMove, { passive: false });
+      window.addEventListener("mouseup", this.endDrag);
+      window.addEventListener("touchend", this.endDrag);
+    },
+
+    onDragMove(event) {
+      if (!this.dragging) return;
+      event.preventDefault();
+
+      const point = event.touches ? event.touches[0] : event;
+      const rect = this.dragging.rect;
+
+      const distance =
+        Math.abs(point.clientX - this.dragging.startClientX) +
+        Math.abs(point.clientY - this.dragging.startClientY);
+      if (distance > 4) {
+        this.dragging.moved = true;
+      }
+
+      this.liveDragPos = {
+        identify: this.dragging.identify,
+        left: point.clientX - rect.left,
+        top: point.clientY - rect.top,
+      };
+    },
+
+    endDrag() {
+      if (!this.dragging) return;
+
+      const { identify, rect, moved } = this.dragging;
+      const table = this.tables.find((t) => t.identify === identify);
+
+      window.removeEventListener("mousemove", this.onDragMove);
+      window.removeEventListener("touchmove", this.onDragMove);
+      window.removeEventListener("mouseup", this.endDrag);
+      window.removeEventListener("touchend", this.endDrag);
+
+      if (!moved) {
+        this.dragging = null;
+        this.liveDragPos = null;
+        if (table) this.openTableOrders(table);
+        return;
+      }
+
+      const positionX = Math.min(100, Math.max(0, (this.liveDragPos.left / rect.width) * 100));
+      const positionY = Math.min(100, Math.max(0, (this.liveDragPos.top / rect.height) * 100));
+
+      if (table) {
+        table.position_x = positionX;
+        table.position_y = positionY;
+      }
+
+      this.dragging = null;
+      this.liveDragPos = null;
+
+      this.updateTablePosition({ identify, positionX, positionY }).catch(() => {
+        this.$vToastify.error("Não foi possível salvar a posição", "Erro");
+      });
+    },
   },
 };
 </script>
@@ -390,6 +524,41 @@ export default {
 .sea {
   flex: 1;
   padding: 32px 24px;
+}
+
+.beach-hint {
+  color: #fff;
+  text-align: center;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.beach-canvas {
+  position: relative;
+  min-height: 480px;
+  background: linear-gradient(180deg, #f4d9a0 0%, #f4d9a0 12%, #1a8fc4 12%, #0e6ea3 100%);
+  border-radius: 16px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.beach-canvas .umbrella-card {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 110px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.beach-canvas .umbrella-card:hover {
+  transform: translate(-50%, -50%);
+}
+
+.beach-canvas .umbrella-card.dragging {
+  cursor: grabbing;
+  z-index: 10;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
 }
 
 .table-grid {

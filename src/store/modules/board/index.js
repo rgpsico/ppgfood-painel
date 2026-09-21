@@ -100,5 +100,12 @@ export default {
                     return response.data.data
                 })
         },
+
+        updateTablePosition({}, { identify, positionX, positionY }) {
+            return axios.patch(`${API_VERSION}/staff/tables/${identify}/position`, {
+                position_x: positionX,
+                position_y: positionY,
+            })
+        },
     },
 }
