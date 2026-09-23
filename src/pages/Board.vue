@@ -26,11 +26,33 @@
     </div>
 
     <div class="sea" v-if="activeTab === 'live' && !loading">
-      <p class="beach-hint" v-if="tables.length > 0">
+      <div class="view-switch" v-if="tables.length > 0">
+        <button
+          class="view-switch-btn"
+          :class="{ active: viewMode === 'map' }"
+          @click="setViewMode('map')"
+        >
+          <i class="fa-solid fa-map-location-dot"></i> Mapa
+        </button>
+        <button
+          class="view-switch-btn"
+          :class="{ active: viewMode === 'list' }"
+          @click="setViewMode('list')"
+        >
+          <i class="fa-solid fa-list"></i> Lista
+        </button>
+      </div>
+
+      <p class="beach-hint" v-if="tables.length > 0 && viewMode === 'map'">
         Toque em um guarda-sol para ver os pedidos. Arraste pra reorganizar o mapa.
       </p>
 
-      <div class="beach-canvas" ref="beachCanvas" :style="{ minHeight: beachHeight + 'px' }">
+      <div
+        v-if="viewMode === 'map'"
+        class="beach-canvas"
+        ref="beachCanvas"
+        :style="{ minHeight: beachHeight + 'px' }"
+      >
         <div
           v-for="table in tablesWithPosition"
           :key="table.identify"
@@ -50,6 +72,31 @@
             {{ table.order.products.length }}
             {{ table.order.products.length === 1 ? "item" : "itens" }}
           </span>
+        </div>
+      </div>
+
+      <div v-else-if="viewMode === 'list'" class="table-list">
+        <div
+          v-for="table in tablesSorted"
+          :key="table.identify"
+          class="table-list-row"
+          :class="{
+            'has-order': table.order,
+            blinking: blinkingTable === table.identify,
+          }"
+          @click="openTableOrders(table)"
+        >
+          <i class="fa-solid fa-umbrella-beach list-icon"></i>
+          <span class="list-name">{{ table.name }}</span>
+          <span class="list-status">
+            <span class="status-dot" :class="table.order ? 'dot-order' : 'dot-free'"></span>
+            <template v-if="table.order">
+              {{ table.order.products.length }}
+              {{ table.order.products.length === 1 ? "item" : "itens" }}
+            </template>
+            <template v-else>Livre</template>
+          </span>
+          <i class="fa-solid fa-chevron-right list-arrow"></i>
         </div>
       </div>
 
@@ -249,6 +296,7 @@ export default {
       dragging: null,
       liveDragPos: null,
       windowWidth: window.innerWidth,
+      viewMode: localStorage.getItem("painel_view_mode") || "map",
     };
   },
 
@@ -295,6 +343,13 @@ export default {
     beachHeight() {
       const rows = Math.ceil(this.tables.length / this.gridColumns) || 1;
       return Math.max(420, 160 + rows * 160);
+    },
+
+    // Guarda-sois em ordem (1, 2, 3...10, nao 1, 10, 2...) pra tela de lista
+    tablesSorted() {
+      return [...this.tables].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true })
+      );
     },
   },
 
@@ -362,6 +417,15 @@ export default {
 
     onResize() {
       this.windowWidth = window.innerWidth;
+    },
+
+    setViewMode(mode) {
+      this.viewMode = mode;
+      try {
+        localStorage.setItem("painel_view_mode", mode);
+      } catch (e) {
+        // localStorage indisponivel - segue sem persistir
+      }
     },
 
     connectRealtime() {
@@ -546,6 +610,104 @@ export default {
 .sea {
   flex: 1;
   padding: 32px 24px;
+}
+
+.view-switch {
+  display: inline-flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 16px;
+}
+
+.view-switch-btn {
+  border: none;
+  background: transparent;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #6c757d;
+  cursor: pointer;
+}
+
+.view-switch-btn.active {
+  background: #0a4d78;
+  color: #fff;
+}
+
+.table-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.table-list-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  padding: 14px 18px;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.table-list-row:hover {
+  transform: translateX(4px);
+}
+
+.table-list-row.has-order {
+  background: #fff3cd;
+  box-shadow: 0 0 0 2px #ffc107;
+}
+
+.table-list-row.blinking {
+  animation: blink 1s infinite;
+}
+
+.list-icon {
+  font-size: 22px;
+  color: #d4820a;
+  width: 24px;
+  text-align: center;
+}
+
+.list-name {
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+}
+
+.list-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #6c757d;
+  font-weight: 600;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.dot-free {
+  background: #28a745;
+}
+
+.status-dot.dot-order {
+  background: #ffc107;
+}
+
+.list-arrow {
+  color: #adb5bd;
+  font-size: 13px;
 }
 
 .beach-hint {
