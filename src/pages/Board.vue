@@ -435,6 +435,18 @@ export default {
         this.APPLY_NEW_ORDER(e.order);
         this.$refs.alertSound.play().catch(() => {});
 
+        const local =
+          e.order.table && e.order.table.name ? e.order.table.name : "Delivery/retirada";
+
+        // canTimeout: false pra o toast so sumir quando o staff clicar -
+        // e o clique (que dispara o dismiss) e o gatilho pra abrir o pedido
+        this.$vToastify.success({
+          title: "Novo pedido!",
+          body: `${local} — toque para ver o pedido`,
+          canTimeout: false,
+          callback: () => this.openDetails(e.order),
+        });
+
         setTimeout(() => this.CLEAR_BLINK(), 6000);
       });
     },
