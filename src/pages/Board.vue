@@ -41,6 +41,13 @@
         >
           <i class="fa-solid fa-list"></i> Lista
         </button>
+        <button
+          class="view-switch-btn"
+          :class="{ active: viewMode === 'beach' }"
+          @click="setViewMode('beach')"
+        >
+          <i class="fa-solid fa-umbrella-beach"></i> Praia
+        </button>
       </div>
 
       <p class="beach-hint" v-if="tables.length > 0 && viewMode === 'map'">
@@ -99,6 +106,13 @@
           <i class="fa-solid fa-chevron-right list-arrow"></i>
         </div>
       </div>
+
+      <BeachMap
+        v-else-if="viewMode === 'beach'"
+        :tables="tables"
+        :blinking-table="blinkingTable"
+        @open-table="openTableOrders"
+      />
 
       <div v-if="tables.length === 0" class="empty-state">
         Nenhum guarda-sol/cadeira cadastrado ainda.
@@ -276,9 +290,14 @@
 import { mapState, mapActions, mapMutations } from "vuex";
 import echo from "@/echo";
 import { SOCKET_URL } from "@/configs/api";
+import BeachMap from "@/components/BeachMap";
 
 export default {
   name: "Board",
+
+  components: {
+    BeachMap,
+  },
 
   data() {
     return {

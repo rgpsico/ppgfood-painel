@@ -59,6 +59,14 @@ export default {
         SET_HISTORY_LOADING(state, loading) {
             state.historyLoading = loading
         },
+
+        SET_TABLE_BEACH_POSITION(state, { identify, row, col }) {
+            const table = state.tables.find((t) => t.identify === identify)
+            if (table) {
+                table.beach_row = row
+                table.beach_col = col
+            }
+        },
     },
 
     actions: {
@@ -105,6 +113,15 @@ export default {
             return axios.patch(`${API_VERSION}/staff/tables/${identify}/position`, {
                 position_x: positionX,
                 position_y: positionY,
+            })
+        },
+
+        updateTableBeachPosition({ commit }, { identify, row, col }) {
+            return axios.patch(`${API_VERSION}/staff/tables/${identify}/beach-position`, {
+                beach_row: row,
+                beach_col: col,
+            }).then(() => {
+                commit('SET_TABLE_BEACH_POSITION', { identify, row, col })
             })
         },
     },
