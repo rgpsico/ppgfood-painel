@@ -3,7 +3,10 @@
     <header class="board-header">
       <div>
         <h1>{{ me ? me.tenant_name : "" }}</h1>
-        <p class="header-subtitle">Painel de recebimento de pedidos</p>
+        <p class="header-subtitle" v-if="isAtendente">
+          Atendente: <strong>{{ me.atendente.name }}</strong> — você vê só os seus pedidos
+        </p>
+        <p class="header-subtitle" v-else>Painel de recebimento de pedidos</p>
       </div>
       <button class="btn-logout" @click="doLogout">Sair</button>
     </header>
@@ -250,6 +253,9 @@
           {{ selectedOrder.table && selectedOrder.table.name ? selectedOrder.table.name : "Sem guarda-sol (delivery/retirada)" }}
         </p>
         <p v-if="selectedOrder.client"><strong>Cliente:</strong> {{ selectedOrder.client.name }}</p>
+        <p v-if="selectedOrder.attendant"><strong>Atendente:</strong> {{ selectedOrder.attendant.name }}</p>
+        <p v-if="selectedOrder.comment"><strong>Observações:</strong> {{ selectedOrder.comment }}</p>
+        <p><strong>Total:</strong> R$ {{ selectedOrder.total }}</p>
         <p><strong>Status:</strong> {{ selectedOrder.status_label }}</p>
         <p><strong>Horário:</strong> {{ selectedOrder.date_br }}</p>
 
@@ -288,8 +294,8 @@
 
 <script>
 import { mapState, mapActions, mapMutations } from "vuex";
-import echo from "@/echo";
-import { SOCKET_URL } from "@/configs/api";
+import echo, { setEchoToken } from "@/echo";
+import { SOCKET_URL, TOKEN_NAME } from "@/configs/api";
 import BeachMap from "@/components/BeachMap";
 
 export default {
@@ -320,6 +326,11 @@ export default {
   },
 
   computed: {
+    // Usuario cadastrado como atendente: ve so os proprios pedidos (o backend filtra de verdade)
+    isAtendente() {
+      return !!(this.me && this.me.atendente);
+    },
+
     ...mapState({
       me: (state) => state.auth.me,
       tables: (state) => state.board.tables,
@@ -380,7 +391,11 @@ export default {
 
   beforeDestroy() {
     if (this.me) {
-      echo.leaveChannel(`order-created.${this.me.tenant_id}`);
+      if (this.isAtendente) {
+        echo.leave(`atendente.${this.me.id}`);
+      } else {
+        echo.leaveChannel(`order-created.${this.me.tenant_id}`);
+      }
     }
 
     window.removeEventListener("resize", this.onResize);
@@ -450,7 +465,18 @@ export default {
     connectRealtime() {
       if (!this.me) return;
 
-      echo.channel(`order-created.${this.me.tenant_id}`).listen("OrderCreated", (e) => {
+      // Atendente NAO escuta o canal da barraca (la passam os pedidos de todo mundo):
+      // so o canal privado dele, autorizado pelo backend.
+      if (this.isAtendente) {
+        setEchoToken(localStorage.getItem(TOKEN_NAME));
+        echo.private(`atendente.${this.me.id}`).listen("AtendenteOrderCreated", this.onNewOrder);
+        return;
+      }
+
+      echo.channel(`order-created.${this.me.tenant_id}`).listen("OrderCreated", this.onNewOrder);
+    },
+
+    onNewOrder(e) {
         this.APPLY_NEW_ORDER(e.order);
         this.$refs.alertSound.play().catch(() => {});
 
@@ -467,7 +493,6 @@ export default {
         });
 
         setTimeout(() => this.CLEAR_BLINK(), 6000);
-      });
     },
 
     openDetails(order) {
