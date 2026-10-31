@@ -13,7 +13,7 @@
       </div>
 
       <div class="toolbar-actions">
-        <button v-if="!editing" class="btn-organize" @click="startEditing">
+        <button v-if="!editing && !readonly" class="btn-organize" @click="startEditing">
           <i class="fa-solid fa-arrows-up-down-left-right"></i> Organizar mapa
         </button>
         <template v-else>
@@ -100,6 +100,11 @@ export default {
     blinkingTable: {
       type: String,
       default: null,
+    },
+    // Atendente: so consulta, nao reorganiza o mapa da barraca
+    readonly: {
+      type: Boolean,
+      default: false,
     },
   },
 

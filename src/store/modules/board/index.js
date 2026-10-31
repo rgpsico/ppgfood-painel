@@ -5,6 +5,8 @@ export default {
     state: {
         tables: [],
         ordersWithoutTable: [],
+        // true quando o backend ja filtrou a lista para um atendente (so os guarda-sois que ele atende)
+        onlyServing: false,
         loading: false,
         // identify da mesa que acabou de receber um pedido novo, pra piscar na tela
         blinkingTable: null,
@@ -14,9 +16,10 @@ export default {
     },
 
     mutations: {
-        SET_BOARD(state, { tables, ordersWithoutTable }) {
+        SET_BOARD(state, { tables, ordersWithoutTable, onlyServing }) {
             state.tables = tables
             state.ordersWithoutTable = ordersWithoutTable
+            state.onlyServing = !!onlyServing
         },
 
         SET_LOADING(state, loading) {
@@ -29,6 +32,13 @@ export default {
                 if (table) {
                     table.order = order
                     state.blinkingTable = table.identify
+                    return
+                }
+
+                // Atendente: o guarda-sol do cliente novo ainda nao estava na lista dele, entra agora
+                if (state.onlyServing) {
+                    state.tables = [...state.tables, { ...order.table, order }]
+                    state.blinkingTable = order.table.identify
                     return
                 }
             }
@@ -45,6 +55,11 @@ export default {
             const table = state.tables.find((t) => t.order && t.order.identify === identify)
             if (table) {
                 table.order = null
+            }
+
+            // Atendente so lista guarda-sol com cliente dele: entregue, sai da lista
+            if (state.onlyServing) {
+                state.tables = state.tables.filter((t) => t.order)
             }
 
             state.ordersWithoutTable = state.ordersWithoutTable.filter(
@@ -77,6 +92,7 @@ export default {
                     commit('SET_BOARD', {
                         tables: response.data.tables,
                         ordersWithoutTable: response.data.orders_without_table,
+                        onlyServing: response.data.only_serving,
                     })
                 })
                 .finally(() => commit('SET_LOADING', false))

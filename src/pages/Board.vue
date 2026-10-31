@@ -54,7 +54,7 @@
       </div>
 
       <p class="beach-hint" v-if="tables.length > 0 && viewMode === 'map'">
-        Toque em um guarda-sol para ver os pedidos. Arraste pra reorganizar o mapa.
+        Toque em um guarda-sol para ver os pedidos.<template v-if="!isAtendente"> Arraste pra reorganizar o mapa.</template>
       </p>
 
       <div
@@ -114,11 +114,15 @@
         v-else-if="viewMode === 'beach'"
         :tables="tables"
         :blinking-table="blinkingTable"
+        :readonly="isAtendente"
         @open-table="openTableOrders"
       />
 
       <div v-if="tables.length === 0" class="empty-state">
-        Nenhum guarda-sol/cadeira cadastrado ainda.
+        <template v-if="isAtendente">
+          Nenhum cliente seu no momento. Quando alguém pedir com você, o guarda-sol aparece aqui.
+        </template>
+        <template v-else>Nenhum guarda-sol/cadeira cadastrado ainda.</template>
       </div>
 
       <div class="no-table-orders" v-if="ordersWithoutTable.length > 0">
@@ -605,6 +609,13 @@ export default {
         this.dragging = null;
         this.liveDragPos = null;
         if (table) this.openTableOrders(table);
+        return;
+      }
+
+      // Mapa e da barraca toda: atendente pode tocar pra ver os pedidos, mas nao reorganiza
+      if (this.isAtendente) {
+        this.dragging = null;
+        this.liveDragPos = null;
         return;
       }
 
