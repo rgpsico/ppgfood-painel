@@ -9,7 +9,7 @@
         <p class="header-subtitle" v-else>Painel de recebimento de pedidos</p>
       </div>
       <div class="header-actions">
-        <button v-if="!isAtendente" class="btn-manage" @click="$bvModal.show('modal-manage-tables')">
+        <button class="btn-manage" @click="$bvModal.show('modal-manage-tables')">
           <i class="fa-solid fa-plus"></i> Guarda-sóis e cadeiras
         </button>
         <button class="btn-logout" @click="doLogout">Sair</button>
@@ -213,7 +213,7 @@
 
     <div v-else class="loading-state">Carregando...</div>
 
-    <TableManager v-if="!isAtendente" />
+    <TableManager :can-delete="!isAtendente" />
 
     <audio ref="alertSound" :src="alertSoundUrl" preload="auto"></audio>
 

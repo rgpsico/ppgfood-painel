@@ -1,5 +1,5 @@
 <template>
-  <b-modal id="modal-manage-tables" title="Guarda-sóis e cadeiras" hide-footer size="lg" scrollable>
+  <b-modal id="modal-manage-tables" title="Guarda-sóis e cadeiras" hide-footer size="lg" scrollable @show="carregar">
     <section class="new-box">
       <h3>Cadastrar</h3>
 
@@ -53,7 +53,8 @@
         <small>{{ guardaSois }} guarda-sol · {{ cadeiras }} cadeira</small>
       </h3>
 
-      <p v-if="tables.length === 0" class="empty">Nada cadastrado ainda.</p>
+      <p v-if="loadingList" class="empty">Carregando...</p>
+      <p v-else-if="tables.length === 0" class="empty">Nada cadastrado ainda.</p>
 
       <ul v-else class="rows">
         <li v-for="table in sorted" :key="table.identify" class="row">
@@ -73,14 +74,14 @@
             </button>
             <button type="button" class="mini" @click="comecarEdicao(table)">Renomear</button>
             <button
-              v-if="confirmDelete !== table.identify"
+              v-if="canDelete && confirmDelete !== table.identify"
               type="button"
               class="mini mini-danger"
               @click="confirmDelete = table.identify"
             >
               Apagar
             </button>
-            <template v-else>
+            <template v-else-if="canDelete">
               <button type="button" class="mini mini-danger" :disabled="busy === table.identify" @click="apagar(table)">
                 Confirmar
               </button>
@@ -94,13 +95,20 @@
 </template>
 
 <script>
-import { mapState, mapActions } from "vuex";
+import { mapActions } from "vuex";
 
 export default {
   name: "TableManager",
 
+  props: {
+    // Atendente cadastra e renomeia, mas so o gerente apaga
+    canDelete: { type: Boolean, default: true },
+  },
+
   data() {
     return {
+      tables: [],
+      loadingList: false,
       form: { tipo: "guarda_sol", nome: "", quantidade: 1 },
       saving: false,
       editing: null,
@@ -111,8 +119,6 @@ export default {
   },
 
   computed: {
-    ...mapState({ tables: (state) => state.board.tables }),
-
     sorted() {
       return [...this.tables].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
     },
@@ -148,7 +154,21 @@ export default {
   },
 
   methods: {
-    ...mapActions(["createTables", "updateTable", "deleteTable"]),
+    ...mapActions(["listAllTables", "createTables", "updateTable", "deleteTable"]),
+
+    // A lista vem do servidor: o quadro do atendente so tem os pontos que ele atende
+    async carregar() {
+      this.loadingList = true;
+      this.editing = null;
+      this.confirmDelete = null;
+      try {
+        this.tables = await this.listAllTables();
+      } catch (e) {
+        this.erro(e);
+      } finally {
+        this.loadingList = false;
+      }
+    },
 
     erro(e) {
       const msg =
@@ -165,6 +185,7 @@ export default {
       this.saving = true;
       try {
         const criados = await this.createTables({ tipo: this.form.tipo, nome, quantidade });
+        this.tables = [...this.tables, ...criados];
         this.$vToastify.success(
           criados.length === 1 ? `${criados[0].name} cadastrado` : `${criados.length} cadastrados`,
           "Pronto"
@@ -178,10 +199,15 @@ export default {
       }
     },
 
+    trocarNaLista(novo) {
+      this.tables = this.tables.map((t) => (t.identify === novo.identify ? { ...t, name: novo.name, tipo: novo.tipo } : t));
+    },
+
     async trocarTipo(table) {
       this.busy = table.identify;
       try {
-        await this.updateTable({ identify: table.identify, tipo: table.tipo === "cadeira" ? "guarda_sol" : "cadeira" });
+        const novo = await this.updateTable({ identify: table.identify, tipo: table.tipo === "cadeira" ? "guarda_sol" : "cadeira" });
+        this.trocarNaLista(novo);
       } catch (e) {
         this.erro(e);
       } finally {
@@ -201,7 +227,8 @@ export default {
 
       this.busy = table.identify;
       try {
-        await this.updateTable({ identify: table.identify, nome });
+        const novo = await this.updateTable({ identify: table.identify, nome });
+        this.trocarNaLista(novo);
         this.editing = null;
       } catch (e) {
         this.erro(e);
@@ -214,6 +241,7 @@ export default {
       this.busy = table.identify;
       try {
         await this.deleteTable(table.identify);
+        this.tables = this.tables.filter((t) => t.identify !== table.identify);
         this.confirmDelete = null;
         this.$vToastify.success(`${table.name} removido`, "Pronto");
       } catch (e) {

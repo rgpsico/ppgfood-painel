@@ -76,6 +76,8 @@ export default {
         },
 
         ADD_TABLES(state, tables) {
+            // Atendente so ve no quadro os pontos que esta atendendo: ponto novo nao entra
+            if (state.onlyServing) return
             state.tables = [...state.tables, ...tables.map((t) => ({ ...t, order: null }))]
         },
 
@@ -149,6 +151,10 @@ export default {
         },
 
         // tipo: 'guarda_sol' | 'cadeira'. Sem nome o backend numera sozinho; quantidade cria varios.
+        listAllTables() {
+            return axios.get(`${API_VERSION}/staff/tables`).then((response) => response.data.data)
+        },
+
         createTables({ commit }, { tipo, nome, quantidade }) {
             return axios.post(`${API_VERSION}/staff/tables`, {
                 tipo,
