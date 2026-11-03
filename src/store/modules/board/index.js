@@ -75,6 +75,22 @@ export default {
             state.historyLoading = loading
         },
 
+        ADD_TABLES(state, tables) {
+            state.tables = [...state.tables, ...tables.map((t) => ({ ...t, order: null }))]
+        },
+
+        UPDATE_TABLE(state, updated) {
+            const table = state.tables.find((t) => t.identify === updated.identify)
+            if (table) {
+                table.name = updated.name
+                table.tipo = updated.tipo
+            }
+        },
+
+        REMOVE_TABLE(state, identify) {
+            state.tables = state.tables.filter((t) => t.identify !== identify)
+        },
+
         SET_TABLE_BEACH_POSITION(state, { identify, row, col }) {
             const table = state.tables.find((t) => t.identify === identify)
             if (table) {
@@ -130,6 +146,31 @@ export default {
                 position_x: positionX,
                 position_y: positionY,
             })
+        },
+
+        // tipo: 'guarda_sol' | 'cadeira'. Sem nome o backend numera sozinho; quantidade cria varios.
+        createTables({ commit }, { tipo, nome, quantidade }) {
+            return axios.post(`${API_VERSION}/staff/tables`, {
+                tipo,
+                nome: nome || undefined,
+                quantidade: quantidade || undefined,
+            }).then((response) => {
+                commit('ADD_TABLES', response.data.data)
+                return response.data.data
+            })
+        },
+
+        updateTable({ commit }, { identify, nome, tipo }) {
+            return axios.put(`${API_VERSION}/staff/tables/${identify}`, { nome, tipo })
+                .then((response) => {
+                    commit('UPDATE_TABLE', response.data.data)
+                    return response.data.data
+                })
+        },
+
+        deleteTable({ commit }, identify) {
+            return axios.delete(`${API_VERSION}/staff/tables/${identify}`)
+                .then(() => commit('REMOVE_TABLE', identify))
         },
 
         updateTableBeachPosition({ commit }, { identify, row, col }) {

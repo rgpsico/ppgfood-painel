@@ -30,8 +30,8 @@
     <p class="beach-hint">
       {{
         editing
-          ? "Arraste os guarda-sóis pra organizar. Toque não abre pedidos nesse modo."
-          : "Toque num guarda-sol pra ver os pedidos."
+          ? "Arraste os guarda-sóis e cadeiras pra organizar. Toque não abre pedidos nesse modo."
+          : "Toque num guarda-sol ou cadeira pra ver os pedidos."
       }}
     </p>
 
@@ -68,7 +68,7 @@
           :style="{ gridRow: table.row + 1, gridColumn: table.col + 1 }"
           @pointerdown="startDrag($event, table)"
         >
-          <i class="fa-solid fa-umbrella-beach tile-icon"></i>
+          <i class="fa-solid tile-icon" :class="table.tipo === 'cadeira' ? 'fa-chair' : 'fa-umbrella-beach'"></i>
           <span class="tile-name">{{ table.name }}</span>
           <span class="tile-status">
             <span class="status-dot" :class="table.order ? 'dot-order' : 'dot-free'"></span>

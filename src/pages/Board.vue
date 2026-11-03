@@ -8,7 +8,12 @@
         </p>
         <p class="header-subtitle" v-else>Painel de recebimento de pedidos</p>
       </div>
-      <button class="btn-logout" @click="doLogout">Sair</button>
+      <div class="header-actions">
+        <button v-if="!isAtendente" class="btn-manage" @click="$bvModal.show('modal-manage-tables')">
+          <i class="fa-solid fa-plus"></i> Guarda-sóis e cadeiras
+        </button>
+        <button class="btn-logout" @click="doLogout">Sair</button>
+      </div>
     </header>
 
     <div class="tabs">
@@ -54,7 +59,7 @@
       </div>
 
       <p class="beach-hint" v-if="tables.length > 0 && viewMode === 'map'">
-        Toque em um guarda-sol para ver os pedidos.<template v-if="!isAtendente"> Arraste pra reorganizar o mapa.</template>
+        Toque em um guarda-sol ou cadeira para ver os pedidos.<template v-if="!isAtendente"> Arraste pra reorganizar o mapa.</template>
       </p>
 
       <div
@@ -76,7 +81,7 @@
           @mousedown="startDrag($event, table)"
           @touchstart="startDrag($event, table)"
         >
-          <i class="fa-solid fa-umbrella-beach umbrella-icon"></i>
+          <i class="fa-solid umbrella-icon" :class="table.tipo === 'cadeira' ? 'fa-chair' : 'fa-umbrella-beach'"></i>
           <span class="table-name">{{ table.name }}</span>
           <span v-if="table.order" class="order-badge">
             {{ table.order.products.length }}
@@ -96,7 +101,7 @@
           }"
           @click="openTableOrders(table)"
         >
-          <i class="fa-solid fa-umbrella-beach list-icon"></i>
+          <i class="fa-solid list-icon" :class="table.tipo === 'cadeira' ? 'fa-chair' : 'fa-umbrella-beach'"></i>
           <span class="list-name">{{ table.name }}</span>
           <span class="list-status">
             <span class="status-dot" :class="table.order ? 'dot-order' : 'dot-free'"></span>
@@ -122,7 +127,12 @@
         <template v-if="isAtendente">
           Nenhum cliente seu no momento. Quando alguém pedir com você, o guarda-sol aparece aqui.
         </template>
-        <template v-else>Nenhum guarda-sol/cadeira cadastrado ainda.</template>
+        <template v-else>
+          Nenhum guarda-sol/cadeira cadastrado ainda.
+          <button class="btn-manage btn-manage-inline" @click="$bvModal.show('modal-manage-tables')">
+            Cadastrar agora
+          </button>
+        </template>
       </div>
 
       <div class="no-table-orders" v-if="ordersWithoutTable.length > 0">
@@ -202,6 +212,8 @@
     </div>
 
     <div v-else class="loading-state">Carregando...</div>
+
+    <TableManager v-if="!isAtendente" />
 
     <audio ref="alertSound" :src="alertSoundUrl" preload="auto"></audio>
 
@@ -301,12 +313,14 @@ import { mapState, mapActions, mapMutations } from "vuex";
 import echo, { setEchoToken } from "@/echo";
 import { SOCKET_URL, TOKEN_NAME } from "@/configs/api";
 import BeachMap from "@/components/BeachMap";
+import TableManager from "@/components/TableManager";
 
 export default {
   name: "Board",
 
   components: {
     BeachMap,
+    TableManager,
   },
 
   data() {
@@ -664,6 +678,27 @@ export default {
   margin: 0;
   font-size: 13px;
   color: #6c757d;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.btn-manage {
+  border: none;
+  background: #0a4d78;
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-manage-inline {
+  margin-left: 8px;
 }
 
 .btn-logout {
