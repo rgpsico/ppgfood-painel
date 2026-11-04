@@ -125,7 +125,7 @@
 
       <div v-if="tables.length === 0" class="empty-state">
         <template v-if="isAtendente">
-          Nenhum cliente seu no momento. Quando alguém pedir com você, o guarda-sol aparece aqui.
+          Nenhum guarda-sol seu ainda. Cadastre um em "Guarda-sóis e cadeiras" ou espere um cliente pedir com você.
         </template>
         <template v-else>
           Nenhum guarda-sol/cadeira cadastrado ainda.

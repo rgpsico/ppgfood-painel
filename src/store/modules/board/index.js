@@ -57,9 +57,9 @@ export default {
                 table.order = null
             }
 
-            // Atendente so lista guarda-sol com cliente dele: entregue, sai da lista
+            // Atendente so lista guarda-sol com cliente dele (ou cadastrado por ele): entregue, sai da lista
             if (state.onlyServing) {
-                state.tables = state.tables.filter((t) => t.order)
+                state.tables = state.tables.filter((t) => t.order || t.mine)
             }
 
             state.ordersWithoutTable = state.ordersWithoutTable.filter(
@@ -76,9 +76,8 @@ export default {
         },
 
         ADD_TABLES(state, tables) {
-            // Atendente so ve no quadro os pontos que esta atendendo: ponto novo nao entra
-            if (state.onlyServing) return
-            state.tables = [...state.tables, ...tables.map((t) => ({ ...t, order: null }))]
+            // Ponto cadastrado pelo atendente ja e dele ("mine"): fica no quadro dele
+            state.tables = [...state.tables, ...tables.map((t) => ({ ...t, order: null, mine: state.onlyServing }))]
         },
 
         UPDATE_TABLE(state, updated) {
