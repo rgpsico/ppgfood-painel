@@ -32,7 +32,17 @@
       >
         Histórico
       </button>
+      <button
+        v-if="!isAtendente"
+        class="tab-btn"
+        :class="{ active: activeTab === 'reports' }"
+        @click="activeTab = 'reports'"
+      >
+        Relatórios
+      </button>
     </div>
+
+    <Reports v-if="activeTab === 'reports' && !isAtendente" :refresh-key="reportsTick" />
 
     <div
       v-if="activeTab === 'live' && !loading && pedidosEsperando.length > 0"
@@ -337,6 +347,7 @@ import { SOCKET_URL, TOKEN_NAME } from "@/configs/api";
 import BeachMap from "@/components/BeachMap";
 import TableManager from "@/components/TableManager";
 import PushToggle from "@/components/PushToggle";
+import Reports from "@/components/Reports";
 import { sincronizarPush } from "@/push";
 
 export default {
@@ -346,6 +357,7 @@ export default {
     BeachMap,
     TableManager,
     PushToggle,
+    Reports,
   },
 
   data() {
@@ -361,6 +373,7 @@ export default {
         orders: [],
         loading: false,
       },
+      reportsTick: 0,
       tituloTimer: null,
       alarmeTimer: null,
       dragging: null,
@@ -479,6 +492,7 @@ export default {
       "updateOrderStatus",
       "getOrdersByTable",
       "updateTablePosition",
+      "applyStatusEvent",
     ]),
     ...mapMutations(["APPLY_NEW_ORDER", "CLEAR_BLINK"]),
 
@@ -537,11 +551,17 @@ export default {
       // Atendente NAO escuta o canal da barraca (la passam os pedidos de todo mundo):
       // so o canal privado dele, autorizado pelo backend.
       if (this.isAtendente) {
-        echo.private(`atendente.${this.me.id}`).listen("AtendenteOrderCreated", this.onNewOrder);
+        echo
+          .private(`atendente.${this.me.id}`)
+          .listen("AtendenteOrderCreated", this.onNewOrder)
+          .listen("OrderStatusChanged", this.onStatusChanged);
         return;
       }
 
-      echo.private(`order-created.${this.me.tenant_id}`).listen("OrderCreated", this.onNewOrder);
+      echo
+        .private(`order-created.${this.me.tenant_id}`)
+        .listen("OrderCreated", this.onNewOrder)
+        .listen("OrderStatusChanged", this.onStatusChanged);
     },
 
     // Repete som + vibracao a cada 6s enquanto houver pedido sem atendimento. Com o celular bloqueado
@@ -618,7 +638,14 @@ export default {
         document.addEventListener("visibilitychange", parar);
     },
 
+    // Outro aparelho atendeu/entregou um pedido: acompanha aqui (para o alarme) e atualiza os relatorios
+    onStatusChanged(e) {
+      this.applyStatusEvent({ identify: e.order.identify, status: e.order.status });
+      this.reportsTick++;
+    },
+
     onNewOrder(e) {
+        this.reportsTick++;
         this.APPLY_NEW_ORDER(e.order);
         this.$refs.alertSound.play().catch(() => {});
 

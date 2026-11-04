@@ -127,6 +127,27 @@ export default {
                 .finally(() => commit('SET_LOADING', false))
         },
 
+        loadReport({}, { period, from, to }) {
+            const params = { period }
+            if (period === 'custom') {
+                params.from = from
+                params.to = to
+            }
+            return axios.get(`${API_VERSION}/staff/reports`, { params }).then((response) => response.data)
+        },
+
+        // Outro aparelho mudou o status de um pedido: este painel acompanha (e o alarme para onde ja foi atendido)
+        applyStatusEvent({ commit, dispatch }, { identify, status }) {
+            if (status === 'done') {
+                commit('REMOVE_DELIVERED_ORDER', identify)
+            } else if (status === 'open') {
+                // pedido reaberto: volta pro quadro com os dados completos
+                return dispatch('loadBoard')
+            } else {
+                commit('SET_ORDER_STATUS', { identify, status })
+            }
+        },
+
         loadHistory({ commit }, { status, table } = {}) {
             commit('SET_HISTORY_LOADING', true)
             return axios.get(`${API_VERSION}/staff/orders`, {
