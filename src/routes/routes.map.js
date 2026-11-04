@@ -1,5 +1,6 @@
 import Login from '@/pages/Login'
 import Board from '@/pages/Board'
+import SuperAdmin from '@/pages/SuperAdmin'
 import store from '@/store'
 
 const routes = [
@@ -19,6 +20,22 @@ const routes = [
                 store.dispatch('getMe').then(() => {
                     next(store.state.auth.authenticated ? undefined : { name: 'login' })
                 })
+            }
+        },
+    },
+    {
+        path: '/super-admin',
+        component: SuperAdmin,
+        name: 'super-admin',
+        beforeEnter: (to, from, next) => {
+            const liberar = () => {
+                const me = store.state.auth.me
+                next(store.state.auth.authenticated && me && me.is_super_admin ? undefined : { path: '/' })
+            }
+            if (store.state.auth.authenticated) {
+                liberar()
+            } else {
+                store.dispatch('getMe').then(liberar)
             }
         },
     },

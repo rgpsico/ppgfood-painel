@@ -9,6 +9,9 @@
         <p class="header-subtitle" v-else>Painel de recebimento de pedidos</p>
       </div>
       <div class="header-actions">
+        <router-link v-if="me && me.is_super_admin" to="/super-admin" class="btn-manage btn-super">
+          <i class="fa-solid fa-shield-halved"></i> Super admin
+        </router-link>
         <PushToggle />
         <button class="btn-manage" @click="$bvModal.show('modal-manage-tables')">
           <i class="fa-solid fa-plus"></i> Guarda-sóis e cadeiras
@@ -851,6 +854,11 @@ export default {
   padding: 8px 14px;
   border-radius: 8px;
   cursor: pointer;
+}
+
+.btn-super {
+  text-decoration: none;
+  background: #5b2a86;
 }
 
 .btn-manage-inline {
