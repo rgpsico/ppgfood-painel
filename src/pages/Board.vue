@@ -9,6 +9,7 @@
         <p class="header-subtitle" v-else>Painel de recebimento de pedidos</p>
       </div>
       <div class="header-actions">
+        <PushToggle />
         <button class="btn-manage" @click="$bvModal.show('modal-manage-tables')">
           <i class="fa-solid fa-plus"></i> Guarda-sóis e cadeiras
         </button>
@@ -314,6 +315,8 @@ import echo, { setEchoToken } from "@/echo";
 import { SOCKET_URL, TOKEN_NAME } from "@/configs/api";
 import BeachMap from "@/components/BeachMap";
 import TableManager from "@/components/TableManager";
+import PushToggle from "@/components/PushToggle";
+import { sincronizarPush } from "@/push";
 
 export default {
   name: "Board",
@@ -321,6 +324,7 @@ export default {
   components: {
     BeachMap,
     TableManager,
+    PushToggle,
   },
 
   data() {
@@ -336,6 +340,7 @@ export default {
         orders: [],
         loading: false,
       },
+      tituloTimer: null,
       dragging: null,
       liveDragPos: null,
       windowWidth: window.innerWidth,
@@ -404,6 +409,7 @@ export default {
   mounted() {
     this.loadBoard();
     this.connectRealtime();
+    sincronizarPush();
     window.addEventListener("resize", this.onResize);
   },
 
@@ -416,6 +422,7 @@ export default {
       }
     }
 
+    clearInterval(this.tituloTimer);
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("mousemove", this.onDragMove);
     window.removeEventListener("touchmove", this.onDragMove);
@@ -496,9 +503,35 @@ export default {
       echo.private(`order-created.${this.me.tenant_id}`).listen("OrderCreated", this.onNewOrder);
     },
 
+    piscarTitulo() {
+        if (!document.hidden || this.tituloTimer) return;
+
+        const original = document.title;
+        let ligado = false;
+
+        this.tituloTimer = setInterval(() => {
+            ligado = !ligado;
+            document.title = ligado ? "🔔 Novo pedido!" : original;
+        }, 1000);
+
+        const parar = () => {
+            if (document.hidden) return;
+            clearInterval(this.tituloTimer);
+            this.tituloTimer = null;
+            document.title = original;
+            document.removeEventListener("visibilitychange", parar);
+        };
+        document.addEventListener("visibilitychange", parar);
+    },
+
     onNewOrder(e) {
         this.APPLY_NEW_ORDER(e.order);
         this.$refs.alertSound.play().catch(() => {});
+
+        // Vibra com o painel aberto (so Android: o iPhone nao deixa o navegador vibrar; la vale o aviso
+        // do sistema) e pisca o titulo da aba enquanto ela estiver escondida.
+        if (navigator.vibrate) navigator.vibrate([300, 120, 300, 120, 300]);
+        this.piscarTitulo();
 
         const local =
           e.order.table && e.order.table.name ? e.order.table.name : "Delivery/retirada";
