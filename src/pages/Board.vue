@@ -412,7 +412,7 @@ export default {
       if (this.isAtendente) {
         echo.leave(`atendente.${this.me.id}`);
       } else {
-        echo.leaveChannel(`order-created.${this.me.tenant_id}`);
+        echo.leave(`order-created.${this.me.tenant_id}`);
       }
     }
 
@@ -483,15 +483,17 @@ export default {
     connectRealtime() {
       if (!this.me) return;
 
+      // Os dois canais sao privados: o echo-server confere o token do painel no Laravel antes de deixar entrar.
+      setEchoToken(localStorage.getItem(TOKEN_NAME));
+
       // Atendente NAO escuta o canal da barraca (la passam os pedidos de todo mundo):
       // so o canal privado dele, autorizado pelo backend.
       if (this.isAtendente) {
-        setEchoToken(localStorage.getItem(TOKEN_NAME));
         echo.private(`atendente.${this.me.id}`).listen("AtendenteOrderCreated", this.onNewOrder);
         return;
       }
 
-      echo.channel(`order-created.${this.me.tenant_id}`).listen("OrderCreated", this.onNewOrder);
+      echo.private(`order-created.${this.me.tenant_id}`).listen("OrderCreated", this.onNewOrder);
     },
 
     onNewOrder(e) {
