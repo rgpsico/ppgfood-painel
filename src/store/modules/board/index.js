@@ -67,6 +67,18 @@ export default {
             )
         },
 
+        // Pedido atendido ("working") continua no quadro, so muda de status (e para de tocar)
+        SET_ORDER_STATUS(state, { identify, status }) {
+            const table = state.tables.find((t) => t.order && t.order.identify === identify)
+            if (table) {
+                table.order = { ...table.order, status }
+            }
+
+            state.ordersWithoutTable = state.ordersWithoutTable.map((o) =>
+                o.identify === identify ? { ...o, status } : o
+            )
+        },
+
         SET_HISTORY(state, orders) {
             state.historyOrders = orders
         },
@@ -137,6 +149,8 @@ export default {
                 .then((response) => {
                     if (status === 'done') {
                         commit('REMOVE_DELIVERED_ORDER', identify)
+                    } else {
+                        commit('SET_ORDER_STATUS', { identify, status })
                     }
                     return response.data.data
                 })

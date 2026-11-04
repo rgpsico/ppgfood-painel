@@ -34,6 +34,18 @@
       </button>
     </div>
 
+    <div
+      v-if="activeTab === 'live' && !loading && pedidosEsperando.length > 0"
+      class="alarm-banner"
+      role="button"
+      @click="openDetails(pedidosEsperando[0])"
+    >
+      <i class="fa-solid fa-bell fa-shake"></i>
+      {{ pedidosEsperando.length }}
+      {{ pedidosEsperando.length === 1 ? "pedido esperando" : "pedidos esperando" }} atendimento
+      <strong>— toque para atender</strong>
+    </div>
+
     <div class="sea" v-if="activeTab === 'live' && !loading">
       <div class="view-switch" v-if="tables.length > 0">
         <button
@@ -291,6 +303,15 @@
         <p class="order-total"><strong>Total: R$ {{ selectedOrder.total }}</strong></p>
 
         <button
+          v-if="selectedOrder.status === 'open'"
+          class="btn-status btn-atender"
+          :disabled="updatingStatus"
+          @click="atenderPedido"
+        >
+          {{ updatingStatus ? "Salvando..." : "Atender pedido (para o alarme)" }}
+        </button>
+
+        <button
           class="btn-status"
           :class="selectedOrder.status === 'done' ? 'btn-undo' : 'btn-deliver'"
           :disabled="updatingStatus"
@@ -341,6 +362,7 @@ export default {
         loading: false,
       },
       tituloTimer: null,
+      alarmeTimer: null,
       dragging: null,
       liveDragPos: null,
       windowWidth: window.innerWidth,
@@ -363,6 +385,11 @@ export default {
       historyOrders: (state) => state.board.historyOrders,
       historyLoading: (state) => state.board.historyLoading,
     }),
+
+    // Pedidos "open" = ninguem atendeu ainda: o painel toca e vibra ate alguem atender
+    pedidosEsperando() {
+      return this.listarEsperando();
+    },
 
     // Menos colunas em telas estreitas, senao os cards de 110px
     // se sobrepoem no celular
@@ -406,6 +433,19 @@ export default {
     },
   },
 
+  watch: {
+    pedidosEsperando: {
+      immediate: true,
+      handler(lista) {
+        if (lista.length > 0) {
+          this.iniciarAlarme();
+        } else {
+          this.pararAlarme();
+        }
+      },
+    },
+  },
+
   mounted() {
     this.loadBoard();
     this.connectRealtime();
@@ -423,6 +463,7 @@ export default {
     }
 
     clearInterval(this.tituloTimer);
+    this.pararAlarme();
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("mousemove", this.onDragMove);
     window.removeEventListener("touchmove", this.onDragMove);
@@ -501,6 +542,59 @@ export default {
       }
 
       echo.private(`order-created.${this.me.tenant_id}`).listen("OrderCreated", this.onNewOrder);
+    },
+
+    // Repete som + vibracao a cada 6s enquanto houver pedido sem atendimento. Com o celular bloqueado
+    // quem insiste e o servidor (lembrete por notificacao a cada minuto).
+    // So pedido "open" dos ultimos 60 min conta: pedido velho esquecido (ou de teste) nao toca para sempre
+    listarEsperando() {
+      const limite = Date.now() - 60 * 60 * 1000;
+      const recente = (o) => !o.created_at || new Date(o.created_at).getTime() >= limite;
+      const nasMesas = this.tables.filter((t) => t.order && t.order.status === "open").map((t) => t.order);
+      const semMesa = this.ordersWithoutTable.filter((o) => o.status === "open");
+      return [...nasMesas, ...semMesa].filter(recente);
+    },
+
+    iniciarAlarme() {
+      if (this.alarmeTimer) return;
+
+      this.alarmeTimer = setInterval(() => {
+        // pedido que ficou velho enquanto a tela esperava: para de tocar
+        if (this.listarEsperando().length === 0) {
+          this.pararAlarme();
+          return;
+        }
+
+        const som = this.$refs.alertSound;
+        if (som) {
+          som.currentTime = 0;
+          som.play().catch(() => {});
+        }
+        if (navigator.vibrate) navigator.vibrate([400, 150, 400, 150, 400]);
+        this.piscarTitulo();
+      }, 6000);
+    },
+
+    pararAlarme() {
+      clearInterval(this.alarmeTimer);
+      this.alarmeTimer = null;
+      if (navigator.vibrate) navigator.vibrate(0);
+    },
+
+    atenderPedido() {
+      this.updatingStatus = true;
+
+      this.updateOrderStatus({ identify: this.selectedOrder.identify, status: "working" })
+        .then((atualizado) => {
+          this.selectedOrder = atualizado;
+          this.$vToastify.success("Pedido em atendimento", "Pronto");
+        })
+        .catch(() => {
+          this.$vToastify.error("Não foi possível atender, tente de novo", "Erro");
+        })
+        .finally(() => {
+          this.updatingStatus = false;
+        });
     },
 
     piscarTitulo() {
@@ -1027,6 +1121,24 @@ export default {
 .btn-status:disabled {
   opacity: 0.7;
   cursor: default;
+}
+
+.btn-atender {
+  background: #d4820a;
+  font-size: 16px;
+  padding: 14px;
+}
+
+.alarm-banner {
+  background: #c62828;
+  color: #fff;
+  padding: 14px 24px;
+  font-size: 15px;
+  text-align: center;
+  cursor: pointer;
+  position: sticky;
+  top: 0;
+  z-index: 20;
 }
 
 .btn-deliver {
