@@ -380,6 +380,7 @@ export default {
       tituloTimer: null,
       alarmeTimer: null,
       dragging: null,
+      realtimeConectado: false,
       liveDragPos: null,
       windowWidth: window.innerWidth,
       viewMode: localStorage.getItem("painel_view_mode") || "map",
@@ -450,6 +451,11 @@ export default {
   },
 
   watch: {
+    // Se o painel abriu antes do /me chegar, conecta assim que ele chegar
+    me() {
+      this.connectRealtime();
+    },
+
     pedidosEsperando: {
       immediate: true,
       handler(lista) {
@@ -465,11 +471,14 @@ export default {
   mounted() {
     this.loadBoard();
     this.connectRealtime();
+    this.iniciarSincronizacao();
     sincronizarPush();
     window.addEventListener("resize", this.onResize);
   },
 
   beforeDestroy() {
+    this.pararSincronizacao();
+
     if (this.me) {
       if (this.isAtendente) {
         echo.leave(`atendente.${this.me.id}`);
@@ -496,8 +505,62 @@ export default {
       "getOrdersByTable",
       "updateTablePosition",
       "applyStatusEvent",
+      "refreshBoard",
     ]),
     ...mapMutations(["APPLY_NEW_ORDER", "CLEAR_BLINK"]),
+
+    // O socket sozinho nao basta: com a aba em segundo plano, trocando de wifi/4G ou com o celular bloqueado,
+    // a conexao morre sem o navegador perceber e os pedidos desse intervalo se perdem. Entao o painel
+    // reconecta e rebusca o quadro ao voltar pra tela, ao reconectar e a cada 20s com a aba aberta.
+    iniciarSincronizacao() {
+      this.ultimaSincronizacao = 0;
+
+      document.addEventListener("visibilitychange", this.aoVoltarParaTela);
+      window.addEventListener("online", this.sincronizar);
+      window.addEventListener("focus", this.sincronizar);
+      window.addEventListener("pageshow", this.sincronizar);
+
+      const socket = echo.connector && echo.connector.socket;
+      if (socket) {
+        socket.on("reconnect", this.sincronizar);
+      }
+
+      this.sincronizarTimer = setInterval(() => {
+        if (!document.hidden) this.sincronizar();
+      }, 20000);
+    },
+
+    pararSincronizacao() {
+      clearInterval(this.sincronizarTimer);
+      document.removeEventListener("visibilitychange", this.aoVoltarParaTela);
+      window.removeEventListener("online", this.sincronizar);
+      window.removeEventListener("focus", this.sincronizar);
+      window.removeEventListener("pageshow", this.sincronizar);
+
+      const socket = echo.connector && echo.connector.socket;
+      if (socket) {
+        socket.off("reconnect", this.sincronizar);
+      }
+    },
+
+    aoVoltarParaTela() {
+      if (!document.hidden) this.sincronizar();
+    },
+
+    sincronizar() {
+      // visibilitychange + focus + pageshow disparam juntos: uma busca so
+      const agora = Date.now();
+      if (agora - this.ultimaSincronizacao < 3000) return;
+      this.ultimaSincronizacao = agora;
+
+      const socket = echo.connector && echo.connector.socket;
+      if (socket && !socket.connected) socket.connect();
+
+      // arrastando um guarda-sol: nao troca o quadro debaixo do dedo
+      if (this.dragging) return;
+
+      this.refreshBoard().catch(() => {});
+    },
 
     showHistory() {
       this.activeTab = "history";
@@ -546,7 +609,8 @@ export default {
     },
 
     connectRealtime() {
-      if (!this.me) return;
+      if (!this.me || this.realtimeConectado) return;
+      this.realtimeConectado = true;
 
       // Os dois canais sao privados: o echo-server confere o token do painel no Laravel antes de deixar entrar.
       setEchoToken(localStorage.getItem(TOKEN_NAME));

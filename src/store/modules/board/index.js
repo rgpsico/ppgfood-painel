@@ -127,6 +127,18 @@ export default {
                 .finally(() => commit('SET_LOADING', false))
         },
 
+        // Mesma carga do loadBoard, mas sem o spinner: serve pra ressincronizar em segundo plano
+        refreshBoard({ commit }) {
+            return axios.get(`${API_VERSION}/staff/orders-board`)
+                .then((response) => {
+                    commit('SET_BOARD', {
+                        tables: response.data.tables,
+                        ordersWithoutTable: response.data.orders_without_table,
+                        onlyServing: response.data.only_serving,
+                    })
+                })
+        },
+
         loadReport({}, { period, from, to }) {
             const params = { period }
             if (period === 'custom') {
