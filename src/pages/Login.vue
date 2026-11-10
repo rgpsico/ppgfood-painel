@@ -6,11 +6,14 @@
 
       <form @submit.prevent="submit">
         <div class="form-group">
-          <label for="email">E-mail</label>
+          <label for="login">Celular ou e-mail</label>
           <input
-            id="email"
-            v-model="email"
-            type="email"
+            id="login"
+            v-model="login"
+            type="text"
+            inputmode="email"
+            autocomplete="username"
+            autocapitalize="none"
             class="form-control"
             required
             autofocus
@@ -46,7 +49,7 @@ export default {
 
   data() {
     return {
-      email: "",
+      login: "",
       password: "",
       loading: false,
       error: "",
@@ -54,20 +57,20 @@ export default {
   },
 
   methods: {
-    ...mapActions(["login"]),
+    ...mapActions({ entrar: "login" }),
 
     submit() {
       this.error = "";
       this.loading = true;
 
-      this.login({ email: this.email, password: this.password })
+      this.entrar({ login: this.login, password: this.password })
         .then(() => {
           this.$router.push({ name: "board" });
         })
         .catch((err) => {
           this.error =
             err.response && err.response.status === 401
-              ? "E-mail ou senha incorretos."
+              ? "Celular/e-mail ou senha incorretos."
               : "Não foi possível entrar. Tente novamente.";
         })
         .finally(() => {

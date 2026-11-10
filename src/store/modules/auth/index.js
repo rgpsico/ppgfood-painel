@@ -20,9 +20,9 @@ export default {
     },
 
     actions: {
-        login({ dispatch }, { email, password }) {
+        login({ dispatch }, { login, password }) {
             return axios.post('staff/login', {
-                email,
+                login,
                 password,
                 device_name: 'painel-web',
             }).then((response) => {
